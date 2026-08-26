@@ -13,7 +13,6 @@ from app.models.obs import (
     ErrorResponse
 )
 from app.services.obs_service import obs_service
-from app.services.video_repository import get_or_create_video_uuid
 
 logger = logging.getLogger(__name__)
 
@@ -91,9 +90,9 @@ async def stop_recording():
 
 @router.get("/recording/getvideo")
 async def get_last_video():
-    """Retorna a URL (por UUID, referenciado no Mongo) do último vídeo gravado e um QR code (base64) dessa URL"""
+    """Retorna a URL do último vídeo gravado (já renomeado para UUID) e um QR code (base64) dessa URL"""
     try:
-        filename = obs_service.get_latest_recording_filename()
+        filename = obs_service.ensure_latest_recording_has_uuid_name()
         if not filename:
             return {"status": "error", "reason": "Nenhum vídeo encontrado na pasta de gravações"}
 
@@ -101,8 +100,7 @@ async def get_last_video():
         if not settings.PUBLIC_BASE_URL:
             return {"status": "error", "reason": "PUBLIC_BASE_URL não configurada"}
 
-        video_id = await get_or_create_video_uuid(filename)
-        url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/videos/{video_id}"
+        url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/videos/{filename}"
         image = obs_service.generate_qrcode_base64(url)
 
         return {"status": "success", "url": url, "image": image}

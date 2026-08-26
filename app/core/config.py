@@ -8,10 +8,6 @@ from typing import Optional
 class Settings(BaseSettings):
     """Configurações da aplicação"""
     
-    # Database Configuration
-    MONGO_URI: Optional[str] = Field(default=None, env="MONGO_URI")
-    MONGO_DB: str = Field("intel", env="MONGO_DB")
-    
     # JWT Configuration
     JWT_SECRET: Optional[str] = Field(default=None, env="JWT_SECRET")
     JWT_ALGORITHM: str = Field("HS256", env="JWT_ALGORITHM")

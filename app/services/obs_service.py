@@ -3,6 +3,7 @@
 from obswebsocket import obsws, requests
 from typing import Optional, Dict, Any, Tuple
 import os
+import uuid
 import base64
 import logging
 from io import BytesIO
@@ -124,7 +125,7 @@ class OBSService:
             return False, str(e)
 
     def stop_recording(self) -> Tuple[bool, str]:
-        """Para a gravação"""
+        """Para a gravação e renomeia o arquivo salvo para um nome baseado em UUID"""
         if not self.ensure_connection() or not self.ws:
             logger.warning("Não foi possível conectar ao OBS")
             return False, "Não foi possível conectar ao OBS Studio"
@@ -132,10 +133,48 @@ class OBSService:
         try:
             self.ws.call(requests.StopRecord())
             logger.info("Gravação parada com sucesso")
+            self.ensure_latest_recording_has_uuid_name()
             return True, ""
         except Exception as e:
             logger.error(f"Erro ao parar gravação: {e}")
             return False, str(e)
+
+    @staticmethod
+    def _is_valid_uuid(value: str) -> bool:
+        """Verifica se a string já é um UUID no formato canônico (ex: gerado por uuid.uuid4())"""
+        try:
+            return str(uuid.UUID(value)) == value.lower()
+        except (ValueError, AttributeError):
+            return False
+
+    def ensure_latest_recording_has_uuid_name(self) -> Optional[str]:
+        """Garante que o vídeo mais recente da pasta tenha o nome em UUID, renomeando se necessário.
+
+        Chamado tanto ao parar a gravação quanto ao consultar /getvideo: se o OBS ainda
+        estiver com o arquivo aberto logo após o StopRecord, o rename pode falhar ali;
+        essa segunda checagem cobre esse caso e também arquivos antigos (nome com data).
+        """
+        filename = self.get_latest_recording_filename()
+        if not filename:
+            return None
+
+        stem, suffix = os.path.splitext(filename)
+        if self._is_valid_uuid(stem):
+            return filename
+
+        settings = get_settings()
+        directory = Path(self._get_full_recording_path(settings.OBS_RECORDING_DIR))
+        original_path = directory / filename
+        new_name = f"{uuid.uuid4()}{suffix.lower()}"
+        new_path = directory / new_name
+
+        try:
+            original_path.rename(new_path)
+            logger.info(f"Arquivo de gravação renomeado para UUID: {filename} -> {new_name}")
+            return new_name
+        except OSError as e:
+            logger.error(f"Falha ao renomear arquivo de gravação {filename} para UUID: {e}")
+            return filename
 
     def get_latest_recording_filename(self) -> Optional[str]:
         """Busca o arquivo de vídeo mais recente na pasta de gravações (OBS_RECORDING_DIR)"""

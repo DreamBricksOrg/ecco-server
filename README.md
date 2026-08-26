@@ -115,9 +115,10 @@ A API estará disponível em: `http://localhost:8003`
   - Response: `{"status": "success", "reason": ""}` ou `{"status": "error", "reason": "..."}`
 - `GET /api/recording/stop` - Para a gravação em andamento
   - Response: `{"status": "success", "reason": ""}` ou `{"status": "error", "reason": "..."}`
-- `GET /api/recording/getvideo` - Busca o vídeo mais recente na pasta `OBS_RECORDING_DIR` e retorna sua URL e um QR code (base64, PNG 256x256) dessa URL
-  - Response: `{"status": "success", "url": "...", "image": "<base64>"}` ou `{"status": "error", "reason": "..."}`
-  - O vídeo fica disponível para download/streaming diretamente em `url` (servido estaticamente em `/videos/<arquivo>`)
+- `GET /api/recording/getvideo` - Busca o vídeo mais recente na pasta `OBS_RECORDING_DIR`, gera (ou reaproveita) um UUID para ele no MongoDB e retorna a URL pública e um QR code (base64, PNG 256x256) dessa URL
+  - Response: `{"status": "success", "url": "https://<PUBLIC_BASE_URL>/videos/<uuid>", "image": "<base64>"}` ou `{"status": "error", "reason": "..."}`
+  - Requer `PUBLIC_BASE_URL` configurada e o MongoDB acessível (guarda o mapeamento `uuid → nome do arquivo` na coleção `videos`)
+  - `GET /videos/{uuid}` resolve o UUID no Mongo e serve o arquivo (download/streaming)
 
 #### 🎬 Controle de Cena
 - `POST /api/scene-item/toggle` - Habilita/desabilita item
@@ -184,6 +185,7 @@ Acesse `http://localhost:8003/docs` para a documentação Swagger interativa.
 | `OBS_PORT` | 4455 | Porta do OBS WebSocket |
 | `OBS_PASSWORD` | v5rk4RQAqy9uX9Eb | Senha do OBS WebSocket |
 | `OBS_RECORDING_DIR` | - | Diretório de gravações (obrigatório, precisa ser um caminho absoluto) |
+| `PUBLIC_BASE_URL` | - | URL pública usada para montar os links de `/api/recording/getvideo` (ex: domínio do ngrok, obrigatório para esse endpoint) |
 
 #### Limpeza Automática de Gravações
 | Variável | Padrão | Descrição |

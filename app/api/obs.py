@@ -1,9 +1,9 @@
 """Router da API para controle do OBS Studio"""
 
-from fastapi import APIRouter, HTTPException, Request
-from urllib.parse import quote
+from fastapi import APIRouter, HTTPException
 import logging
 
+from app.core.config import get_settings
 from app.models.obs import (
     TextUpdateRequest,
     RecordingDirectoryRequest,
@@ -13,6 +13,7 @@ from app.models.obs import (
     ErrorResponse
 )
 from app.services.obs_service import obs_service
+from app.services.video_repository import get_or_create_video_uuid
 
 logger = logging.getLogger(__name__)
 
@@ -56,9 +57,7 @@ async def start_recording():
         if not obs_service.ensure_connection():
             return {"status": "error", "reason": "OBS Studio não está conectado"}
 
-        from app.core.config import get_settings
         settings = get_settings()
-
         full_path = obs_service._get_full_recording_path(settings.OBS_RECORDING_DIR)
         if not obs_service.set_recording_directory(full_path):
             return {"status": "error", "reason": "Falha ao configurar diretório de gravação padrão"}
@@ -91,14 +90,19 @@ async def stop_recording():
         return {"status": "error", "reason": str(e)}
 
 @router.get("/recording/getvideo")
-async def get_last_video(request: Request):
-    """Retorna a URL do último vídeo salvo na pasta de gravações e um QR code (base64) dessa URL"""
+async def get_last_video():
+    """Retorna a URL (por UUID, referenciado no Mongo) do último vídeo gravado e um QR code (base64) dessa URL"""
     try:
         filename = obs_service.get_latest_recording_filename()
         if not filename:
             return {"status": "error", "reason": "Nenhum vídeo encontrado na pasta de gravações"}
 
-        url = f"{str(request.base_url).rstrip('/')}/videos/{quote(filename)}"
+        settings = get_settings()
+        if not settings.PUBLIC_BASE_URL:
+            return {"status": "error", "reason": "PUBLIC_BASE_URL não configurada"}
+
+        video_id = await get_or_create_video_uuid(filename)
+        url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/videos/{video_id}"
         image = obs_service.generate_qrcode_base64(url)
 
         return {"status": "success", "url": url, "image": image}

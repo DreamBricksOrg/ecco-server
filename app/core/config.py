@@ -38,8 +38,13 @@ class Settings(BaseSettings):
     OBS_HOST: str = Field("localhost", env="OBS_HOST")
     OBS_PORT: int = Field(4455, env="OBS_PORT")
     OBS_PASSWORD: str = Field("v5rk4RQAqy9uX9Eb", env="OBS_PASSWORD")
-    OBS_RECORDING_DIR: str = Field(default="./recordings", env="OBS_RECORDING_DIR")
-        
+    OBS_RECORDING_DIR: Optional[str] = Field(default=None, env="OBS_RECORDING_DIR")
+
+    # Limpeza Automática de Gravações
+    DELETE_OLD_FILES: bool = Field(False, env="DELETE_OLD_FILES")
+    DELETE_OLD_FILES_MAX_LIFE: int = Field(60, env="DELETE_OLD_FILES_MAX_LIFE")
+    DELETE_OLD_FILES_MAX_POLL: int = Field(5, env="DELETE_OLD_FILES_MAX_POLL")
+
     # Server Settings
     HOST: str = Field("0.0.0.0", env="HOST")
     PORT: int = Field(8000, env="PORT")

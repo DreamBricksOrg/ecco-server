@@ -119,3 +119,8 @@ ehthumbs.db
 Thumbs.db
 
 recordings/
+
+# PyInstaller build artifacts (tools/)
+tools/build/
+tools/dist/
+tools/*.spec

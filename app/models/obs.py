@@ -16,17 +16,6 @@ class TextUpdateRequest(BaseModel):
             }
         }
 
-class RecordingRequest(BaseModel):
-    """Request para controle de gravação"""
-    directory: Optional[str] = Field(None, description="Diretório para salvar a gravação")
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "directory": "C:\\Gravacoes\\OBS"
-            }
-        }
-
 class SceneItemRequest(BaseModel):
     """Request para controle de itens de cena"""
     source_name: str = Field(..., description="Nome da fonte/item de cena")

@@ -1,12 +1,11 @@
 """Router da API para controle do OBS Studio"""
 
-from fastapi import APIRouter, HTTPException
-from typing import Optional
+from fastapi import APIRouter, HTTPException, Request
+from urllib.parse import quote
 import logging
 
 from app.models.obs import (
     TextUpdateRequest,
-    RecordingRequest,
     RecordingDirectoryRequest,
     SceneItemRequest,
     OBSStatusResponse,
@@ -50,86 +49,63 @@ async def update_text_source(request: TextUpdateRequest):
             detail="Erro interno do servidor"
         )
 
-@router.post("/recording/start", response_model=SuccessResponse)
-async def start_recording(request: Optional[RecordingRequest] = None):
+@router.get("/recording/start")
+async def start_recording():
     """Inicia a gravação no OBS"""
     try:
-        if not obs_service.is_connected:
-            raise HTTPException(
-                status_code=503,
-                detail="OBS Studio não está conectado"
-            )
-        
-        # Importa as configurações
+        if not obs_service.ensure_connection():
+            return {"status": "error", "reason": "OBS Studio não está conectado"}
+
         from app.core.config import get_settings
         settings = get_settings()
-        
-        # Se não foi passado request ou diretório, usa o padrão
-        if not request or not request.directory:
-            # Configura o diretório padrão
-            full_path = obs_service._get_full_recording_path(settings.OBS_RECORDING_DIR)
-            set_success = obs_service.set_recording_directory(full_path)
-            if not set_success:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Falha ao configurar diretório de gravação padrão"
-                )
-            directory = None  # Usa None para que o OBS use o diretório já configurado
-        else:
-            directory = request.directory
-        
-        success = obs_service.start_recording(directory)
-        
+
+        full_path = obs_service._get_full_recording_path(settings.OBS_RECORDING_DIR)
+        if not obs_service.set_recording_directory(full_path):
+            return {"status": "error", "reason": "Falha ao configurar diretório de gravação padrão"}
+
+        success, reason = obs_service.start_recording()
         if not success:
-            raise HTTPException(
-                status_code=400,
-                detail="Falha ao iniciar gravação. Verifique as configurações do OBS."
-            )
-        
-        message = "Gravação iniciada com sucesso"
-        used_directory = directory or settings.OBS_RECORDING_DIR
-        if used_directory:
-            message += f" no diretório: {used_directory}"
-        
-        return SuccessResponse(message=message)
-    
-    except HTTPException:
-        raise
+            return {"status": "error", "reason": reason}
+
+        return {"status": "success", "reason": ""}
+
     except Exception as e:
         logger.error(f"Erro inesperado ao iniciar gravação: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="Erro interno do servidor"
-        )
+        return {"status": "error", "reason": str(e)}
 
-@router.post("/recording/stop", response_model=SuccessResponse)
+@router.get("/recording/stop")
 async def stop_recording():
     """Para a gravação no OBS"""
     try:
-        if not obs_service.is_connected:
-            raise HTTPException(
-                status_code=503,
-                detail="OBS Studio não está conectado"
-            )
-        
-        success = obs_service.stop_recording()
-        
+        if not obs_service.ensure_connection():
+            return {"status": "error", "reason": "OBS Studio não está conectado"}
+
+        success, reason = obs_service.stop_recording()
         if not success:
-            raise HTTPException(
-                status_code=400,
-                detail="Falha ao parar gravação. Verifique se há uma gravação em andamento."
-            )
-        
-        return SuccessResponse(message="Gravação parada com sucesso")
-    
-    except HTTPException:
-        raise
+            return {"status": "error", "reason": reason}
+
+        return {"status": "success", "reason": ""}
+
     except Exception as e:
         logger.error(f"Erro inesperado ao parar gravação: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="Erro interno do servidor"
-        )
+        return {"status": "error", "reason": str(e)}
+
+@router.get("/recording/getvideo")
+async def get_last_video(request: Request):
+    """Retorna a URL do último vídeo salvo na pasta de gravações e um QR code (base64) dessa URL"""
+    try:
+        filename = obs_service.get_latest_recording_filename()
+        if not filename:
+            return {"status": "error", "reason": "Nenhum vídeo encontrado na pasta de gravações"}
+
+        url = f"{str(request.base_url).rstrip('/')}/videos/{quote(filename)}"
+        image = obs_service.generate_qrcode_base64(url)
+
+        return {"status": "success", "url": url, "image": image}
+
+    except Exception as e:
+        logger.error(f"Erro inesperado ao obter último vídeo: {e}")
+        return {"status": "error", "reason": str(e)}
 
 
 @router.get("/status", response_model=OBSStatusResponse)

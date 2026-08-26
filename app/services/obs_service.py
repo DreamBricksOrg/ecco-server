@@ -1,18 +1,24 @@
 """Serviço para controle do OBS Studio via WebSocket"""
 
 from obswebsocket import obsws, requests
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 import os
+import base64
 import logging
+from io import BytesIO
 from pathlib import Path
+
+import qrcode
 
 from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
+VIDEO_EXTENSIONS = {".mp4", ".mkv", ".flv", ".mov", ".ts", ".avi"}
+
 class OBSService:
     """Serviço para controlar o OBS Studio via WebSocket"""
-    
+
     def __init__(self):
         settings = get_settings()
         self.host = settings.OBS_HOST
@@ -95,41 +101,69 @@ class OBSService:
             logger.error(f"Erro ao atualizar fonte de texto {source_name}: {e}")
             return False
     
-    def start_recording(self, directory: Optional[str] = None) -> bool:
+    def start_recording(self, directory: Optional[str] = None) -> Tuple[bool, str]:
         """Inicia a gravação"""
         if not self.ensure_connection() or not self.ws:
             logger.warning("Não foi possível conectar ao OBS")
-            return False
-        
+            return False, "Não foi possível conectar ao OBS Studio"
+
         try:
             # Compõe o caminho completo do diretório de gravação
             full_recording_path = self._get_full_recording_path(directory)
-            
+
             if full_recording_path and not self.set_recording_directory(full_recording_path):
-                logger.error(f"Falha ao definir diretório de gravação: {full_recording_path}")
-                return False
-            
+                reason = f"Falha ao definir diretório de gravação: {full_recording_path}"
+                logger.error(reason)
+                return False, reason
+
             self.ws.call(requests.StartRecord())
             logger.info(f"Gravação iniciada com sucesso{f' no diretório: {full_recording_path}' if full_recording_path else ''}")
-            return True
+            return True, ""
         except Exception as e:
             logger.error(f"Erro ao iniciar gravação: {e}")
-            return False
-    
-    def stop_recording(self) -> bool:
+            return False, str(e)
+
+    def stop_recording(self) -> Tuple[bool, str]:
         """Para a gravação"""
         if not self.ensure_connection() or not self.ws:
             logger.warning("Não foi possível conectar ao OBS")
-            return False
-        
+            return False, "Não foi possível conectar ao OBS Studio"
+
         try:
             self.ws.call(requests.StopRecord())
             logger.info("Gravação parada com sucesso")
-            return True
+            return True, ""
         except Exception as e:
             logger.error(f"Erro ao parar gravação: {e}")
-            return False
-    
+            return False, str(e)
+
+    def get_latest_recording_filename(self) -> Optional[str]:
+        """Busca o arquivo de vídeo mais recente na pasta de gravações (OBS_RECORDING_DIR)"""
+        settings = get_settings()
+        directory = Path(self._get_full_recording_path(settings.OBS_RECORDING_DIR))
+
+        if not directory.is_dir():
+            return None
+
+        videos = [f for f in directory.iterdir() if f.is_file() and f.suffix.lower() in VIDEO_EXTENSIONS]
+        if not videos:
+            return None
+
+        latest = max(videos, key=lambda f: f.stat().st_mtime)
+        return latest.name
+
+    def generate_qrcode_base64(self, data: str, size: int = 256) -> str:
+        """Gera um QR code 256x256 (PNG) da string informada, retornado em base64"""
+        qr = qrcode.QRCode(border=1)
+        qr.add_data(data)
+        qr.make(fit=True)
+        image = qr.make_image(fill_color="black", back_color="white").convert("RGB")
+        image = image.resize((size, size))
+
+        buffer = BytesIO()
+        image.save(buffer, format="PNG")
+        return base64.b64encode(buffer.getvalue()).decode("utf-8")
+
     def set_recording_directory(self, directory_path: str) -> bool:
         """Define o diretório de gravação"""
         if not self._connected or not self.ws:
@@ -168,19 +202,20 @@ class OBSService:
             return None
     
     def _get_full_recording_path(self, directory: Optional[str] = None) -> str:
-        """Compõe o caminho completo do diretório de gravação"""
+        """Retorna o caminho de gravação, que precisa ser absoluto"""
         settings = get_settings()
-        
+
         # Usa o diretório especificado ou o padrão das configurações
         recording_dir = directory or settings.OBS_RECORDING_DIR
-        
-        # Se o caminho for relativo, compõe com o diretório atual do servidor
+
+        if not recording_dir:
+            raise ValueError("OBS_RECORDING_DIR não foi configurado")
+
         if not os.path.isabs(recording_dir):
-            # Obtém o diretório raiz do projeto (onde está o main.py)
-            project_root = Path(__file__).parent.parent.parent
-            full_path = project_root / recording_dir
-            return str(full_path.resolve())
-        
+            raise ValueError(
+                f"OBS_RECORDING_DIR precisa ser um caminho absoluto, recebido: '{recording_dir}'"
+            )
+
         return recording_dir
     
     def create_directory_if_not_exists(self, directory_path: str) -> bool:

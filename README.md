@@ -86,7 +86,7 @@ OBS_RECORDING_DIR=C:\Users\SeuUsuario\Videos\OBS
 python main.py
 ```
 
-A API estará disponível em: `http://localhost:8000`
+A API estará disponível em: `http://localhost:8003`
 
 ## 📚 Documentação da API
 
@@ -97,11 +97,11 @@ A API estará disponível em: `http://localhost:8000`
 - `GET /health` - Status de saúde
 
 #### 🔌 Conexão OBS
-- `POST /obs/connect` - Conectar manualmente ao OBS
-- `POST /obs/disconnect` - Desconectar do OBS
+- `POST /api/connect` - Conectar manualmente ao OBS
+- `POST /api/disconnect` - Desconectar do OBS
 
 #### 📝 Controle de Texto
-- `POST /obs/text/update` - Atualiza fonte de texto
+- `POST /api/text/update` - Atualiza fonte de texto
 
 ```json
 {
@@ -111,17 +111,16 @@ A API estará disponível em: `http://localhost:8000`
 ```
 
 #### 🎥 Controle de Gravação
-- `POST /obs/recording/start` - Inicia gravação
-- `POST /obs/recording/stop` - Para gravação
-
-```json
-{
-  "directory": "C:\\Gravacoes\\OBS"  // Opcional
-}
-```
+- `GET /api/recording/start` - Inicia gravação no diretório padrão (`OBS_RECORDING_DIR`)
+  - Response: `{"status": "success", "reason": ""}` ou `{"status": "error", "reason": "..."}`
+- `GET /api/recording/stop` - Para a gravação em andamento
+  - Response: `{"status": "success", "reason": ""}` ou `{"status": "error", "reason": "..."}`
+- `GET /api/recording/getvideo` - Busca o vídeo mais recente na pasta `OBS_RECORDING_DIR` e retorna sua URL e um QR code (base64, PNG 256x256) dessa URL
+  - Response: `{"status": "success", "url": "...", "image": "<base64>"}` ou `{"status": "error", "reason": "..."}`
+  - O vídeo fica disponível para download/streaming diretamente em `url` (servido estaticamente em `/videos/<arquivo>`)
 
 #### 🎬 Controle de Cena
-- `POST /obs/scene-item/toggle` - Habilita/desabilita item
+- `POST /api/scene-item/toggle` - Habilita/desabilita item
 
 ```json
 {
@@ -132,11 +131,11 @@ A API estará disponível em: `http://localhost:8000`
 ```
 
 #### 📊 Status
-- `GET /obs/status` - Status da conexão OBS
+- `GET /api/status` - Status da conexão OBS
 
 ### Documentação Interativa
 
-Acesse `http://localhost:8000/docs` para a documentação Swagger interativa.
+Acesse `http://localhost:8003/docs` para a documentação Swagger interativa.
 
 ## ⚙️ Configuração
 
@@ -184,7 +183,14 @@ Acesse `http://localhost:8000/docs` para a documentação Swagger interativa.
 | `OBS_HOST` | localhost | Host do OBS WebSocket |
 | `OBS_PORT` | 4455 | Porta do OBS WebSocket |
 | `OBS_PASSWORD` | v5rk4RQAqy9uX9Eb | Senha do OBS WebSocket |
-| `OBS_RECORDING_DIR` | None | Diretório padrão para gravações (opcional) |
+| `OBS_RECORDING_DIR` | - | Diretório de gravações (obrigatório, precisa ser um caminho absoluto) |
+
+#### Limpeza Automática de Gravações
+| Variável | Padrão | Descrição |
+|----------|--------|----------|
+| `DELETE_OLD_FILES` | false | Liga/desliga a limpeza automática de vídeos antigos |
+| `DELETE_OLD_FILES_MAX_LIFE` | 60 | Vida máxima de cada vídeo, em minutos, antes de ser apagado |
+| `DELETE_OLD_FILES_MAX_POLL` | 5 | Intervalo, em minutos, entre cada verificação |
 
 #### API e Servidor
 | Variável | Padrão | Descrição |

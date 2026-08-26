@@ -3,6 +3,7 @@
 from obswebsocket import obsws, requests
 from typing import Optional, Dict, Any, Tuple
 import os
+import time
 import uuid
 import base64
 import logging
@@ -147,12 +148,15 @@ class OBSService:
         except (ValueError, AttributeError):
             return False
 
-    def ensure_latest_recording_has_uuid_name(self) -> Optional[str]:
+    def ensure_latest_recording_has_uuid_name(self, retries: int = 20, retry_delay: float = 0.5) -> Optional[str]:
         """Garante que o vídeo mais recente da pasta tenha o nome em UUID, renomeando se necessário.
 
         Chamado tanto ao parar a gravação quanto ao consultar /getvideo: se o OBS ainda
         estiver com o arquivo aberto logo após o StopRecord, o rename pode falhar ali;
         essa segunda checagem cobre esse caso e também arquivos antigos (nome com data).
+
+        Se o rename falhar em todas as tentativas (arquivo ainda travado), retorna None
+        em vez do nome original — o nome com data nunca deve ser exposto pelo /getvideo.
         """
         filename = self.get_latest_recording_filename()
         if not filename:
@@ -168,13 +172,25 @@ class OBSService:
         new_name = f"{uuid.uuid4()}{suffix.lower()}"
         new_path = directory / new_name
 
-        try:
-            original_path.rename(new_path)
-            logger.info(f"Arquivo de gravação renomeado para UUID: {filename} -> {new_name}")
-            return new_name
-        except OSError as e:
-            logger.error(f"Falha ao renomear arquivo de gravação {filename} para UUID: {e}")
-            return filename
+        for attempt in range(1, retries + 1):
+            try:
+                original_path.rename(new_path)
+                logger.info(f"Arquivo de gravação renomeado para UUID: {filename} -> {new_name}")
+                return new_name
+            except OSError as e:
+                if attempt == retries:
+                    logger.error(
+                        f"Falha ao renomear arquivo de gravação {filename} para UUID "
+                        f"após {retries} tentativas: {e}"
+                    )
+                    return None
+                logger.warning(
+                    f"Falha ao renomear {filename} para UUID (tentativa {attempt}/{retries}), "
+                    f"tentando novamente: {e}"
+                )
+                time.sleep(retry_delay)
+
+        return None
 
     def get_latest_recording_filename(self) -> Optional[str]:
         """Busca o arquivo de vídeo mais recente na pasta de gravações (OBS_RECORDING_DIR)"""

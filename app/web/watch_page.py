@@ -40,10 +40,6 @@ def render_watch_page(filename: str, video_url: str) -> str:
   body {{
     margin: 0;
     min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     color: var(--text);
     background: var(--bg);
@@ -53,19 +49,38 @@ def render_watch_page(filename: str, video_url: str) -> str:
     background-attachment: fixed;
   }}
 
+  header.site-header {{
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    padding: 16px 24px;
+    background: rgba(10, 6, 18, 0.55);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    z-index: 10;
+  }}
+
+  .logo {{
+    display: block;
+    height: 32px;
+    width: auto;
+  }}
+
+  main.content {{
+    display: flex;
+    justify-content: center;
+    padding: 20vh 24px 24px;
+  }}
+
   .card {{
     width: 100%;
     max-width: 480px;
     display: flex;
     flex-direction: column;
     gap: 18px;
-  }}
-
-  .logo {{
-    display: block;
-    width: 100%;
-    max-width: 280px;
-    margin: 0 auto 12px;
   }}
 
   h1 {{
@@ -148,16 +163,20 @@ def render_watch_page(filename: str, video_url: str) -> str:
 </style>
 </head>
 <body>
-  <div class="card">
+  <header class="site-header">
     <img class="logo" src="{_LOGO_DATA_URI}" alt="ECCO">
-    <h1>Seu vídeo está pronto</h1>
-    <p class="subtitle">Assista abaixo ou baixe para guardar no seu dispositivo</p>
-    <video id="video" src="{safe_video_url}" controls playsinline preload="metadata"></video>
-    <div class="actions">
-      <a class="download" href="{safe_video_url}" download="{safe_filename}">Baixar vídeo</a>
-      <button type="button" class="share" id="share-btn" hidden>Compartilhar</button>
+  </header>
+  <main class="content">
+    <div class="card">
+      <h1>Seu vídeo está pronto</h1>
+      <p class="subtitle">Assista abaixo ou baixe para guardar no seu dispositivo</p>
+      <video id="video" src="{safe_video_url}" controls playsinline preload="metadata"></video>
+      <div class="actions">
+        <a class="download" href="{safe_video_url}" download="{safe_filename}">Baixar vídeo</a>
+        <button type="button" class="share" id="share-btn" hidden>Compartilhar</button>
+      </div>
     </div>
-  </div>
+  </main>
   <script>
     (function () {{
       var video = document.getElementById('video');

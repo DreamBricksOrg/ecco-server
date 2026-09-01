@@ -223,18 +223,24 @@ class OBSService:
         """Define o diretório de gravação"""
         if not self._connected or not self.ws:
             return False
-        
+
         try:
             if not self.create_directory_if_not_exists(directory_path):
                 return False
-            
-            # Usa SetProfileParameter para definir o diretório de gravação
-            # Funciona com OBS Studio versões mais antigas que não suportam SetRecordDirectory
-            self.ws.call(requests.SetProfileParameter(
-                parameterCategory="SimpleOutput",
-                parameterName="FilePath", 
-                parameterValue=directory_path
-            ))
+
+            try:
+                # SetRecordDirectory define o caminho realmente usado pelo OBS,
+                # independente do modo de saída (Simple ou Advanced).
+                self.ws.call(requests.SetRecordDirectory(recordDirectory=directory_path))
+            except Exception:
+                # Fallback para OBS Studio/obs-websocket mais antigos, que não suportam
+                # SetRecordDirectory (só existe a partir do obs-websocket 5.3 / OBS 29).
+                # Só reflete no caminho real de gravação se o OBS estiver em modo Simple.
+                self.ws.call(requests.SetProfileParameter(
+                    parameterCategory="SimpleOutput",
+                    parameterName="FilePath",
+                    parameterValue=directory_path
+                ))
             logger.info(f"Diretório de gravação definido: {directory_path}")
             return True
         except Exception as e:
@@ -245,16 +251,24 @@ class OBSService:
         """Obtém o diretório atual de gravação"""
         if not self._connected or not self.ws:
             return None
-        
+
         try:
-            response = self.ws.call(requests.GetProfileParameter(
-                parameterCategory="SimpleOutput",
-                parameterName="FilePath"
-            ))
-            return response.getParameterValue()
-        except Exception as e:
-            logger.error(f"Erro ao obter diretório de gravação: {e}")
-            return None
+            # GetRecordDirectory reflete o caminho realmente usado pelo OBS,
+            # independente do modo de saída (Simple ou Advanced).
+            response = self.ws.call(requests.GetRecordDirectory())
+            return response.datain.get("recordDirectory")
+        except Exception:
+            try:
+                # Fallback para OBS Studio/obs-websocket mais antigos, que não
+                # suportam GetRecordDirectory (só existe a partir do 5.3 / OBS 29).
+                response = self.ws.call(requests.GetProfileParameter(
+                    parameterCategory="SimpleOutput",
+                    parameterName="FilePath"
+                ))
+                return response.getParameterValue()
+            except Exception as e:
+                logger.error(f"Erro ao obter diretório de gravação: {e}")
+                return None
     
     def _get_full_recording_path(self, directory: Optional[str] = None) -> str:
         """Retorna o caminho de gravação, que precisa ser absoluto"""

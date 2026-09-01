@@ -15,10 +15,10 @@ API REST para controlar o OBS Studio remotamente via WebSocket.
 ## 🏗️ Estrutura do Projeto
 
 ```
-obs-controller-api/
+ecco-server/
 ├── app/
 │   ├── __init__.py
-│   ├── main.py              # Inicializador da aplicação FastAPI
+│   ├── main.py              # Inicializador da aplicação FastAPI, rotas /videos e /watch
 │   ├── api/
 │   │   ├── __init__.py
 │   │   └── obs.py           # Endpoints da API OBS
@@ -30,12 +30,16 @@ obs-controller-api/
 │   │   └── obs.py           # Schemas Pydantic
 │   ├── services/
 │   │   ├── __init__.py
-│   │   └── obs_service.py   # Lógica de negócio OBS
+│   │   ├── obs_service.py       # Lógica de negócio OBS
+│   │   └── cleanup_service.py   # Limpeza automática de gravações antigas
+│   ├── web/
+│   │   ├── __init__.py
+│   │   └── watch_page.py    # Página HTML de player/download (/watch/{filename})
 │   ├── db/
-│   │   └── __init__.py
-│   └── util/
-│       └── __init__.py
-├── utils/                   # Legado (será removido)
+│   │   └── __init__.py      # Stub vazio (MongoDB foi removido, ver histórico do git)
+│   └── utils/                # Legado, não usado pela aplicação
+├── tools/
+│   └── fullscreen_clock.py  # Utilitário standalone para testar sincronização de gravação
 ├── main.py                  # Ponto de entrada
 ├── .gitignore
 └── README.md
@@ -55,7 +59,7 @@ obs-controller-api/
 ### Estratégia de Conexão
 
 - **Conexão Automática**: A API conecta automaticamente ao OBS quando necessário
-- **Desconexão Manual**: Use o endpoint `/obs/disconnect` para desconectar
+- **Desconexão Manual**: Use o endpoint `/api/disconnect` para desconectar
 - **Reconexão**: A API reconecta automaticamente em operações subsequentes
 
 ### Instalação
@@ -68,7 +72,7 @@ cd obs-controller-api
 
 2. Instale as dependências:
 ```bash
-pip install fastapi uvicorn obs-websocket-py pydantic-settings
+pip install -r requirements.txt
 ```
 
 3. Configure as variáveis de ambiente (opcional):
@@ -113,12 +117,22 @@ A API estará disponível em: `http://localhost:8003`
 #### 🎥 Controle de Gravação
 - `GET /api/recording/start` - Inicia gravação no diretório padrão (`OBS_RECORDING_DIR`)
   - Response: `{"status": "success", "reason": ""}` ou `{"status": "error", "reason": "..."}`
-- `GET /api/recording/stop` - Para a gravação em andamento
+- `GET /api/recording/stop` - Para a gravação em andamento e já renomeia o arquivo gravado para um nome em UUID
   - Response: `{"status": "success", "reason": ""}` ou `{"status": "error", "reason": "..."}`
-- `GET /api/recording/getvideo` - Busca o vídeo mais recente na pasta `OBS_RECORDING_DIR`, gera (ou reaproveita) um UUID para ele no MongoDB e retorna a URL pública e um QR code (base64, PNG 256x256) dessa URL
-  - Response: `{"status": "success", "url": "https://<PUBLIC_BASE_URL>/videos/<uuid>", "image": "<base64>"}` ou `{"status": "error", "reason": "..."}`
-  - Requer `PUBLIC_BASE_URL` configurada e o MongoDB acessível (guarda o mapeamento `uuid → nome do arquivo` na coleção `videos`)
-  - `GET /videos/{uuid}` resolve o UUID no Mongo e serve o arquivo (download/streaming)
+- `GET /api/recording/getvideo` - Busca o vídeo mais recente na pasta `OBS_RECORDING_DIR`, garante que o arquivo esteja renomeado para UUID (renomeia na hora se ainda não estiver) e retorna a URL pública da página de visualização e um QR code (base64, PNG 256x256) dessa URL
+  - Response: `{"status": "success", "url": "https://<PUBLIC_BASE_URL>/watch/<uuid>.<ext>", "image": "<base64>"}` ou `{"status": "error", "reason": "..."}`
+  - Requer `PUBLIC_BASE_URL` configurada. Não depende de banco de dados — o UUID é o próprio nome do arquivo em disco
+- `GET /watch/{filename}` - Página HTML com player de vídeo e botão de download, pensada para ser aberta a partir do QR code
+- `GET /videos/{filename}` - Serve o arquivo de vídeo diretamente (usado pelo player da página `/watch` e para download/streaming programático)
+- `GET /api/recording/directory` - Obtém o diretório de gravação atual configurado no OBS
+  - Response: `{"directory": "..."}`
+- `POST /api/recording/directory` - Define o diretório de gravação do OBS
+
+```json
+{
+  "directory": "C:\\Gravacoes\\OBS"
+}
+```
 
 #### 🎬 Controle de Cena
 - `POST /api/scene-item/toggle` - Habilita/desabilita item
@@ -142,42 +156,6 @@ Acesse `http://localhost:8003/docs` para a documentação Swagger interativa.
 
 ### Variáveis de Ambiente
 
-#### Configurações de Banco de Dados
-| Variável | Padrão | Descrição |
-|----------|--------|----------|
-| `MONGO_URI` | - | URI de conexão MongoDB (obrigatório) |
-| `MONGO_DB` | intel | Nome do banco de dados |
-
-#### Configurações JWT
-| Variável | Padrão | Descrição |
-|----------|--------|----------|
-| `JWT_SECRET` | - | Chave secreta JWT (obrigatório) |
-| `JWT_ALGORITHM` | HS256 | Algoritmo de criptografia JWT |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | 1440 | Tempo de expiração do token (minutos) |
-| `ADMIN_CREATION_TOKEN` | - | Token para criação de admin (obrigatório) |
-
-#### Monitoramento (Opcional)
-| Variável | Padrão | Descrição |
-|----------|--------|----------|
-| `SENTRY_DSN` | None | DSN do Sentry para monitoramento |
-| `LOG_API` | None | API de logs externa |
-| `LOG_ID` | None | ID do sistema de logs |
-
-#### Serviços Externos
-| Variável | Padrão | Descrição |
-|----------|--------|----------|
-| `SHORTENER_BASE_URL` | https://go.dbpe.com.br | URL base do encurtador |
-| `SHORTENER_USER` | - | Usuário do encurtador (obrigatório) |
-| `SHORTENER_PASSWORD` | - | Senha do encurtador (obrigatório) |
-| `CADASTRO_BASE_URL` | https://skynelite.ngrok.app/api/skyn/cta | URL do sistema de cadastro |
-
-#### Comunicação
-| Variável | Padrão | Descrição |
-|----------|--------|----------|
-| `UDP_PORT` | 5004 | Porta UDP para comunicação |
-| `SERIAL_PORT` | COM3 | Porta serial |
-| `SERIAL_BAUDRATE` | 9600 | Taxa de transmissão serial |
-
 #### OBS WebSocket
 | Variável | Padrão | Descrição |
 |----------|--------|----------|
@@ -198,18 +176,22 @@ Acesse `http://localhost:8003/docs` para a documentação Swagger interativa.
 | Variável | Padrão | Descrição |
 |----------|--------|----------|
 | `HOST` | 0.0.0.0 | Host da API |
-| `PORT` | 8000 | Porta da API |
+| `PORT` | 8000 | Porta da API (`8003` é a porta convencional usada em desenvolvimento local) |
 | `RELOAD` | true | Auto-reload em desenvolvimento |
 | `LOG_LEVEL` | INFO | Nível de log |
+
+> `.env.example` também lista variáveis como `JWT_*`, `SENTRY_DSN`, `SHORTENER_*`, `CADASTRO_BASE_URL`, `UDP_PORT` e `SERIAL_*`. Elas existem na classe `Settings` mas **não são lidas em nenhum lugar de `app/`** — são resquícios de um projeto relacionado e não afetam o comportamento desta API.
 
 ## 🔧 Desenvolvimento
 
 ### Estrutura Modular
 
-- **`app/main.py`**: Factory da aplicação FastAPI
+- **`app/main.py`**: Factory da aplicação FastAPI, rotas `/videos/{filename}` e `/watch/{filename}`
 - **`app/api/obs.py`**: Routers e endpoints
 - **`app/models/obs.py`**: Schemas de request/response
-- **`app/services/obs_service.py`**: Lógica de negócio
+- **`app/services/obs_service.py`**: Lógica de negócio OBS (conexão, gravação, renomeio para UUID)
+- **`app/services/cleanup_service.py`**: Limpeza automática de gravações antigas
+- **`app/web/watch_page.py`**: Página HTML de player/download exibida em `/watch/{filename}`
 - **`app/core/config.py`**: Configurações centralizadas
 
 ### Logs

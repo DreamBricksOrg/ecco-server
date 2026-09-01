@@ -1,6 +1,11 @@
 """Página HTML de visualização/download do vídeo gravado (servida em /watch/{filename})"""
 
+import base64
 from html import escape
+from pathlib import Path
+
+_LOGO_PATH = Path(__file__).parent / "assets" / "logo_header.png"
+_LOGO_DATA_URI = "data:image/png;base64," + base64.b64encode(_LOGO_PATH.read_bytes()).decode("ascii")
 
 
 def render_watch_page(filename: str, video_url: str) -> str:
@@ -54,6 +59,13 @@ def render_watch_page(filename: str, video_url: str) -> str:
     display: flex;
     flex-direction: column;
     gap: 18px;
+  }}
+
+  .logo {{
+    display: block;
+    width: 100%;
+    max-width: 280px;
+    margin: 0 auto;
   }}
 
   h1 {{
@@ -137,6 +149,7 @@ def render_watch_page(filename: str, video_url: str) -> str:
 </head>
 <body>
   <div class="card">
+    <img class="logo" src="{_LOGO_DATA_URI}" alt="ECCO">
     <h1>Seu vídeo está pronto 🎬</h1>
     <p class="subtitle">Assista abaixo ou baixe para guardar no seu dispositivo</p>
     <video id="video" src="{safe_video_url}" controls playsinline preload="metadata"></video>

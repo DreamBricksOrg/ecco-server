@@ -65,7 +65,7 @@ def render_watch_page(filename: str, video_url: str) -> str:
     display: block;
     width: 100%;
     max-width: 280px;
-    margin: 0 auto;
+    margin: 0 auto 12px;
   }}
 
   h1 {{
@@ -150,7 +150,7 @@ def render_watch_page(filename: str, video_url: str) -> str:
 <body>
   <div class="card">
     <img class="logo" src="{_LOGO_DATA_URI}" alt="ECCO">
-    <h1>Seu vídeo está pronto 🎬</h1>
+    <h1>Seu vídeo está pronto</h1>
     <p class="subtitle">Assista abaixo ou baixe para guardar no seu dispositivo</p>
     <video id="video" src="{safe_video_url}" controls playsinline preload="metadata"></video>
     <div class="actions">

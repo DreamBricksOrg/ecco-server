@@ -77,7 +77,14 @@ def render_watch_page(filename: str, video_url: str) -> str:
     box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 12px 40px rgba(109, 40, 217, 0.35);
   }}
 
-  a.download {{
+  .actions {{
+    display: flex;
+    gap: 12px;
+  }}
+
+  a.download,
+  button.share {{
+    flex: 1;
     display: block;
     text-align: center;
     text-decoration: none;
@@ -85,10 +92,16 @@ def render_watch_page(filename: str, video_url: str) -> str:
     border-radius: 999px;
     font-weight: 600;
     font-size: 1rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+  }}
+
+  a.download {{
     color: var(--text);
+    border: none;
     background: linear-gradient(135deg, var(--accent-blue), var(--bg-glow-1) 45%, var(--bg-glow-2));
     box-shadow: 0 8px 24px rgba(192, 38, 212, 0.35);
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
   }}
 
   a.download:hover,
@@ -100,14 +113,79 @@ def render_watch_page(filename: str, video_url: str) -> str:
   a.download:active {{
     transform: translateY(0);
   }}
+
+  button.share {{
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(192, 38, 212, 0.6);
+  }}
+
+  button.share:hover,
+  button.share:focus-visible {{
+    border-color: var(--accent-gold);
+    transform: translateY(-1px);
+  }}
+
+  button.share:active {{
+    transform: translateY(0);
+  }}
+
+  button.share[hidden] {{
+    display: none;
+  }}
 </style>
 </head>
 <body>
   <div class="card">
     <h1>Seu vídeo está pronto 🎬</h1>
     <p class="subtitle">Assista abaixo ou baixe para guardar no seu dispositivo</p>
-    <video src="{safe_video_url}" controls playsinline preload="metadata"></video>
-    <a class="download" href="{safe_video_url}" download="{safe_filename}">Baixar vídeo</a>
+    <video id="video" src="{safe_video_url}" controls playsinline preload="metadata"></video>
+    <div class="actions">
+      <a class="download" href="{safe_video_url}" download="{safe_filename}">Baixar vídeo</a>
+      <button type="button" class="share" id="share-btn" hidden>Compartilhar</button>
+    </div>
   </div>
+  <script>
+    (function () {{
+      var video = document.getElementById('video');
+      var shareBtn = document.getElementById('share-btn');
+      var shareBtnDefaultLabel = shareBtn.textContent;
+
+      function canShareFiles() {{
+        if (!navigator.share || !navigator.canShare) return false;
+        try {{
+          var probe = new File([''], 'probe.mp4', {{ type: 'video/mp4' }});
+          return navigator.canShare({{ files: [probe] }});
+        }} catch (e) {{
+          return false;
+        }}
+      }}
+
+      if (canShareFiles()) {{
+        shareBtn.hidden = false;
+      }}
+
+      shareBtn.addEventListener('click', async function () {{
+        try {{
+          var response = await fetch(video.currentSrc || video.src);
+          var blob = await response.blob();
+          var file = new File([blob], '{safe_filename}', {{ type: blob.type || 'video/mp4' }});
+
+          await navigator.share({{
+            files: [file],
+            title: 'Meu vídeo',
+            text: 'Confira meu vídeo!'
+          }});
+        }} catch (error) {{
+          if (error && error.name === 'AbortError') return;
+          console.error('Erro ao compartilhar:', error);
+          shareBtn.textContent = 'Falha ao compartilhar';
+          setTimeout(function () {{
+            shareBtn.textContent = shareBtnDefaultLabel;
+          }}, 2000);
+        }}
+      }});
+    }})();
+  </script>
 </body>
 </html>"""

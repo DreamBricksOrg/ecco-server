@@ -100,8 +100,9 @@ async def get_last_video():
         if not settings.PUBLIC_BASE_URL:
             return {"status": "error", "reason": "PUBLIC_BASE_URL não configurada"}
 
-        url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/watch/{filename}"
-        image = obs_service.generate_qrcode_base64(url)
+        urlw = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/watch/{filename}"
+        url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/videos/{filename}"
+        image = obs_service.generate_qrcode_base64(urlw)
 
         return {"status": "success", "url": url, "image": image}
 

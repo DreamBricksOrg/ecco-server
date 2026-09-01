@@ -57,9 +57,6 @@ def render_watch_page(filename: str, video_url: str) -> str:
     display: flex;
     justify-content: center;
     padding: 16px 24px;
-    background: rgba(10, 6, 18, 0.55);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
     z-index: 10;
   }}
 

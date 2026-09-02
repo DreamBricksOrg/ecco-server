@@ -20,6 +20,8 @@ python main.py
 
 There is no test suite, linter, or formatter configured in this repo.
 
+`ffmpeg` must be installed and on `PATH` — `app/services/video_overlay.py` shells out to it to composite the overlay image onto recordings.
+
 The API listens on `HOST:PORT` from settings (default `0.0.0.0:8000`; `.env.example`/README show `8003` as the conventional local port). Interactive docs are served at `/docs`.
 
 ## Configuration
@@ -44,7 +46,8 @@ app/
 ├── models/obs.py               # Pydantic request/response schemas
 ├── services/
 │   ├── obs_service.py          # OBSService — owns the obs-websocket connection + all OBS logic; module-level singleton `obs_service`
-│   └── cleanup_service.py      # background loop that deletes recordings older than DELETE_OLD_FILES_MAX_LIFE
+│   ├── cleanup_service.py      # background loop that deletes recordings older than DELETE_OLD_FILES_MAX_LIFE
+│   └── video_overlay.py        # apply_overlay() — composites app/assets/ecco_msg.png over a recording via ffmpeg
 ├── core/config.py              # pydantic-settings Settings + get_settings() (lru_cache'd)
 └── utils/                      # legacy/unused code, not imported by app/ (see below)
 tools/
@@ -53,7 +56,7 @@ tools/
 
 **Connection model**: `obs_service` (in `app/services/obs_service.py`) is a single module-level `OBSService` instance shared by the whole app — not a per-request dependency. Most endpoints call `obs_service.ensure_connection()` to lazily (re)connect rather than requiring an existing connection; a few (`/api/text/update`, `/api/status`, `/api/recording/directory` GET/POST) check `obs_service.is_connected` and fail instead of auto-connecting. Keep this distinction in mind when adding endpoints.
 
-**Video file flow**: OBS writes recordings with its own filename to `OBS_RECORDING_DIR`. `OBSService.ensure_latest_recording_has_uuid_name()` finds the newest video file there (by mtime, matched against `VIDEO_EXTENSIONS`) and renames it to `<uuid4>.<ext>` if it isn't already UUID-named — with retries, since OBS may still hold the file open right after `StopRecord`. This is called both when recording stops and when `/api/recording/getvideo` is hit, so a file that was open during stop still gets renamed on the next `getvideo` poll. If renaming fails on every retry, the endpoint returns an error rather than ever exposing the OBS-generated (date-based) filename publicly. `app/main.py` serves the file straight off disk at `GET /videos/{filename}`, sanitizing the filename via `Path(filename).name` to prevent path traversal — there is no database lookup involved.
+**Video file flow**: OBS writes recordings with its own filename to `OBS_RECORDING_DIR`. `OBSService.ensure_latest_recording_has_uuid_name()` finds the newest video file there (by mtime, matched against `VIDEO_EXTENSIONS`) and renames it to `<uuid4>.<ext>` if it isn't already UUID-named — with retries, since OBS may still hold the file open right after `StopRecord`. This is called both when recording stops and when `/api/recording/getvideo` is hit, so a file that was open during stop still gets renamed on the next `getvideo` poll. If renaming fails on every retry, the endpoint returns an error rather than ever exposing the OBS-generated (date-based) filename publicly. Immediately after a successful rename in `stop_recording()`, `video_overlay.apply_overlay()` re-encodes the file in place (via ffmpeg, same UUID filename) to burn `app/assets/ecco_msg.png` over the whole video; if ffmpeg is missing or fails, this is logged and the original (un-overlaid) recording is left in place rather than failing the stop-recording call. This overlay step only fires from `stop_recording()` — a recording whose rename was still locked at stop time and only completes later via a `getvideo` poll will not get the overlay. `app/main.py` serves the file straight off disk at `GET /videos/{filename}`, sanitizing the filename via `Path(filename).name` to prevent path traversal — there is no database lookup involved.
 
 **Scene item / text source lookups**: OBS's WebSocket API doesn't support looking up a source nested inside a group directly, so `OBSService` implements recursive group search (`_find_source_in_groups` → `_search_source_in_scene` → `_is_group_source` / `_search_source_in_group`) to locate sources by name for both `update_text_source` and `set_scene_item_enabled`.
 

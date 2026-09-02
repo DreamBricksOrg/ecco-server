@@ -31,10 +31,13 @@ ecco-server/
 │   ├── services/
 │   │   ├── __init__.py
 │   │   ├── obs_service.py       # Lógica de negócio OBS
-│   │   └── cleanup_service.py   # Limpeza automática de gravações antigas
+│   │   ├── cleanup_service.py   # Limpeza automática de gravações antigas
+│   │   └── video_overlay.py     # Aplica app/assets/ecco_msg.png sobre a gravação via ffmpeg
 │   ├── web/
 │   │   ├── __init__.py
 │   │   └── watch_page.py    # Página HTML de player/download (/watch/{filename})
+│   ├── assets/
+│   │   └── ecco_msg.png     # Imagem de overlay aplicada às gravações
 │   ├── db/
 │   │   └── __init__.py      # Stub vazio (MongoDB foi removido, ver histórico do git)
 │   └── utils/                # Legado, não usado pela aplicação
@@ -55,6 +58,7 @@ ecco-server/
    - Habilite o servidor WebSocket
    - Configure a porta (padrão: 4455) e senha
 3. **Python 3.8+** instalado
+4. **ffmpeg** instalado e disponível no PATH (usado para aplicar o overlay `app/assets/ecco_msg.png` sobre as gravações)
 
 ### Estratégia de Conexão
 

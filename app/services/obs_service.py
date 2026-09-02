@@ -13,6 +13,7 @@ from pathlib import Path
 import qrcode
 
 from app.core.config import get_settings
+from app.services.video_overlay import apply_overlay
 
 logger = logging.getLogger(__name__)
 
@@ -134,7 +135,13 @@ class OBSService:
         try:
             self.ws.call(requests.StopRecord())
             logger.info("Gravação parada com sucesso")
-            self.ensure_latest_recording_has_uuid_name()
+
+            filename = self.ensure_latest_recording_has_uuid_name()
+            if filename:
+                settings = get_settings()
+                directory = Path(self._get_full_recording_path(settings.OBS_RECORDING_DIR))
+                apply_overlay(directory / filename)
+
             return True, ""
         except Exception as e:
             logger.error(f"Erro ao parar gravação: {e}")

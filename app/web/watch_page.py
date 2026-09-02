@@ -65,7 +65,7 @@ def render_watch_page(filename: str, video_url: str) -> str:
 
   .logo {{
     display: block;
-    height: 24px;
+    height: 36px;
     width: auto;
   }}
 
@@ -83,7 +83,8 @@ def render_watch_page(filename: str, video_url: str) -> str:
     min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    justify-content: center;
+    gap: 18px;
   }}
 
   h1 {{
@@ -103,12 +104,12 @@ def render_watch_page(filename: str, video_url: str) -> str:
   }}
 
   video {{
-    flex: 1 1 auto;
-    min-height: 0;
-    width: 100%;
+    flex: 0 0 auto;
+    align-self: center;
+    height: 42vh;
+    aspect-ratio: 9 / 16;
     object-fit: contain;
     border-radius: 16px;
-    background: #000;
     box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 12px 40px rgba(109, 40, 217, 0.35);
   }}
 

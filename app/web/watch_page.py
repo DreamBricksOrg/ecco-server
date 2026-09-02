@@ -37,9 +37,16 @@ def render_watch_page(filename: str, video_url: str) -> str:
 
   * {{ box-sizing: border-box; }}
 
+  html, body {{
+    height: 100%;
+  }}
+
   body {{
     margin: 0;
-    min-height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     color: var(--text);
     background: var(--bg);
@@ -50,58 +57,63 @@ def render_watch_page(filename: str, video_url: str) -> str:
   }}
 
   header.site-header {{
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
+    flex: 0 0 auto;
     display: flex;
     justify-content: center;
-    padding: 16px 24px;
-    z-index: 10;
+    padding: 12px 24px 0;
   }}
 
   .logo {{
     display: block;
-    height: 32px;
+    height: 24px;
     width: auto;
   }}
 
   main.content {{
+    flex: 1 1 auto;
+    min-height: 0;
     display: flex;
     justify-content: center;
-    padding: 20vh 24px 24px;
+    padding: 10px 24px 16px;
   }}
 
   .card {{
     width: 100%;
-    max-width: 480px;
+    max-width: 420px;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 10px;
   }}
 
   h1 {{
+    flex: 0 0 auto;
     margin: 0;
-    font-size: 1.4rem;
+    font-size: 1.15rem;
     font-weight: 600;
     text-align: center;
   }}
 
   p.subtitle {{
-    margin: -12px 0 0;
+    flex: 0 0 auto;
+    margin: 0;
     text-align: center;
     color: var(--text-muted);
-    font-size: 0.92rem;
+    font-size: 0.85rem;
   }}
 
   video {{
+    flex: 1 1 auto;
+    min-height: 0;
     width: 100%;
+    object-fit: contain;
     border-radius: 16px;
     background: #000;
     box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 12px 40px rgba(109, 40, 217, 0.35);
   }}
 
   .actions {{
+    flex: 0 0 auto;
     display: flex;
     gap: 12px;
   }}
@@ -112,10 +124,10 @@ def render_watch_page(filename: str, video_url: str) -> str:
     display: block;
     text-align: center;
     text-decoration: none;
-    padding: 14px 20px;
+    padding: 12px 20px;
     border-radius: 999px;
     font-weight: 600;
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-family: inherit;
     cursor: pointer;
     transition: box-shadow 0.2s ease, transform 0.2s ease;

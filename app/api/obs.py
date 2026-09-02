@@ -1,9 +1,11 @@
 """Router da API para controle do OBS Studio"""
 
 from fastapi import APIRouter, HTTPException
+import asyncio
 import logging
 
 from app.core.config import get_settings
+from app.core.logcenter import get_sender
 from app.models.obs import (
     TextUpdateRequest,
     RecordingDirectoryRequest,
@@ -63,8 +65,14 @@ async def start_recording():
 
         success, reason = obs_service.start_recording()
         if not success:
+            sender = get_sender()
+            if sender:
+                asyncio.create_task(sender.send("ERROR", "falha_iniciar_gravacao", data={"reason": reason}, status="ERROR"))
             return {"status": "error", "reason": reason}
 
+        sender = get_sender()
+        if sender:
+            asyncio.create_task(sender.send("INFO", "gravacao_iniciada", status="OK"))
         return {"status": "success", "reason": ""}
 
     except Exception as e:
@@ -80,8 +88,14 @@ async def stop_recording():
 
         success, reason = obs_service.stop_recording()
         if not success:
+            sender = get_sender()
+            if sender:
+                asyncio.create_task(sender.send("ERROR", "falha_parar_gravacao", data={"reason": reason}, status="ERROR"))
             return {"status": "error", "reason": reason}
 
+        sender = get_sender()
+        if sender:
+            asyncio.create_task(sender.send("INFO", "gravacao_encerrada", status="OK"))
         return {"status": "success", "reason": ""}
 
     except Exception as e:
@@ -104,6 +118,9 @@ async def get_last_video():
         url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/videos/{filename}"
         image = obs_service.generate_qrcode_base64(urlw)
 
+        sender = get_sender()
+        if sender:
+            asyncio.create_task(sender.send("INFO", "url_video_gerada", data={"url": url}, status="OK"))
         return {"status": "success", "url": url, "image": image}
 
     except Exception as e:
@@ -202,6 +219,9 @@ async def disconnect_obs():
     """Desconecta do OBS Studio"""
     try:
         obs_service.disconnect()
+        sender = get_sender()
+        if sender:
+            asyncio.create_task(sender.send("INFO", "obs_desconectado", status="OK"))
         return SuccessResponse(message="Desconectado do OBS Studio com sucesso")
     except Exception as e:
         logger.error(f"Erro ao desconectar do OBS: {e}")
@@ -212,6 +232,9 @@ async def connect_obs():
     """Conecta ao OBS Studio manualmente"""
     try:
         if obs_service.connect():
+            sender = get_sender()
+            if sender:
+                asyncio.create_task(sender.send("INFO", "obs_conectado", status="OK"))
             return SuccessResponse(message="Conectado ao OBS Studio com sucesso")
         else:
             raise HTTPException(status_code=500, detail="Falha ao conectar com OBS Studio")

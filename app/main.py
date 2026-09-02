@@ -7,6 +7,7 @@ import logging
 from pathlib import Path
 
 from app.core.config import get_settings
+from app.core.logcenter import init_logcenter, get_sender
 from app.api.obs import router as obs_router
 from app.services.obs_service import obs_service
 from app.services.cleanup_service import cleanup_old_recordings_loop
@@ -27,13 +28,22 @@ logger = logging.getLogger(__name__)
 def create_app() -> FastAPI:
     """Factory function para criar a aplicação FastAPI"""
     settings = get_settings()
-    
+
     app = FastAPI(
         title="OBS Controller API",
         description="API para controlar o OBS Studio remotamente",
         version="1.0.0"
     )
-    
+
+    # Registra middleware de auditoria HTTP (loga erros 5xx automaticamente)
+    if settings.LOG_API and settings.LOG_ID:
+        try:
+            from logcenter_sdk import LogCenterAuditMiddleware
+            sender = init_logcenter(settings.LOG_API, settings.LOG_ID, settings.LOG_API_KEY)
+            app.add_middleware(LogCenterAuditMiddleware, sender=sender)
+        except Exception:
+            logger.warning("LogCenter não pôde ser inicializado; logs remotos desativados")
+
     # Incluir routers
     app.include_router(obs_router, prefix="/api", tags=["OBS"])
 
@@ -49,6 +59,10 @@ def create_app() -> FastAPI:
         if not file_path.is_file():
             raise HTTPException(status_code=404, detail="Vídeo não encontrado")
 
+        sender = get_sender()
+        if sender:
+            asyncio.create_task(sender.send("INFO", "video_acessado", data={"filename": safe_name}, status="OK"))
+
         return FileResponse(str(file_path), media_type="video/mp4", filename=safe_name)
 
     # Página de player + download, aberta a partir do QR code de /api/recording/getvideo
@@ -59,6 +73,10 @@ def create_app() -> FastAPI:
         if not file_path.is_file():
             raise HTTPException(status_code=404, detail="Vídeo não encontrado")
 
+        sender = get_sender()
+        if sender:
+            asyncio.create_task(sender.send("INFO", "pagina_download_acessada", data={"filename": safe_name}, status="OK"))
+
         return render_watch_page(safe_name, f"/videos/{safe_name}")
 
     # Limpeza automática de gravações antigas
@@ -66,12 +84,24 @@ def create_app() -> FastAPI:
     async def start_cleanup_task():
         if settings.DELETE_OLD_FILES:
             app.state.cleanup_task = asyncio.create_task(cleanup_old_recordings_loop())
+        try:
+            sender = get_sender()
+            if sender:
+                sender.start_background_flush()
+        except Exception:
+            logger.warning("Falha ao iniciar flush periódico do LogCenter")
 
     @app.on_event("shutdown")
     async def stop_cleanup_task():
         task = getattr(app.state, "cleanup_task", None)
         if task:
             task.cancel()
+        try:
+            sender = get_sender()
+            if sender:
+                await sender.stop_background_flush()
+        except Exception:
+            logger.warning("Falha ao encerrar flush do LogCenter")
 
     # Endpoint raiz
     @app.get("/")

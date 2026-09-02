@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     SENTRY_DSN: Optional[str] = Field(default=None, env="SENTRY_DSN")
     LOG_API: Optional[str] = Field(default=None, env="LOG_API")
     LOG_ID: Optional[str] = Field(default=None, env="LOG_ID")
+    LOG_API_KEY: Optional[str] = Field(default=None, env="LOG_API_KEY")
     
     # External Services
     SHORTENER_BASE_URL: Optional[str] = Field(default="https://go.dbpe.com.br", env="SHORTENER_BASE_URL")

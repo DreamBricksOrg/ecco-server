@@ -32,7 +32,6 @@ def render_watch_page(filename: str, video_url: str) -> str:
     --accent-mint: #4ade80;
     --accent-gold: #ffb347;
     --text: #f2fdf6;
-    --text-muted: #a3c9b2;
   }}
 
   * {{ box-sizing: border-box; }}
@@ -93,14 +92,6 @@ def render_watch_page(filename: str, video_url: str) -> str:
     font-size: 1.15rem;
     font-weight: 600;
     text-align: center;
-  }}
-
-  p.subtitle {{
-    flex: 0 0 auto;
-    margin: 0;
-    text-align: center;
-    color: var(--text-muted);
-    font-size: 0.85rem;
   }}
 
   video {{
@@ -179,7 +170,6 @@ def render_watch_page(filename: str, video_url: str) -> str:
   <main class="content">
     <div class="card">
       <h1>Seu vídeo está pronto</h1>
-      <p class="subtitle">Assista abaixo ou baixe para guardar no seu dispositivo</p>
       <video id="video" src="{safe_video_url}" controls playsinline preload="metadata"></video>
       <div class="actions">
         <a class="download" href="{safe_video_url}" download="{safe_filename}">Baixar vídeo</a>

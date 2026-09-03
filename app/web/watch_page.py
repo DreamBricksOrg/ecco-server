@@ -59,7 +59,7 @@ def render_watch_page(filename: str, video_url: str) -> str:
     flex: 0 0 auto;
     display: flex;
     justify-content: center;
-    padding: 8px 24px 0;
+    padding: 20px 24px 0;
   }}
 
   .logo {{

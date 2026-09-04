@@ -26,10 +26,10 @@ def render_watch_page(filename: str, video_url: str) -> str:
 <title>Seu vídeo está pronto</title>
 <style>
   :root {{
-    --bg: #071a10;
-    --bg-glow-1: #14532d;
-    --bg-glow-2: #22c55e;
-    --accent-mint: #4ade80;
+    --bg: #051615;
+    --bg-glow-1: #004c49;
+    --bg-glow-2: #007e7a;
+    --accent-mint: #0abb98;
     --accent-gold: #ffb347;
     --text: #f2fdf6;
   }}
@@ -50,8 +50,8 @@ def render_watch_page(filename: str, video_url: str) -> str:
     color: var(--text);
     background: var(--bg);
     background-image:
-      radial-gradient(circle at 20% 15%, rgba(21, 128, 61, 0.5), transparent 55%),
-      radial-gradient(circle at 85% 80%, rgba(74, 222, 128, 0.3), transparent 50%);
+      radial-gradient(circle at 20% 15%, rgba(0, 126, 122, 0.5), transparent 55%),
+      radial-gradient(circle at 85% 80%, rgba(10, 187, 152, 0.3), transparent 50%);
     background-attachment: fixed;
   }}
 
@@ -101,7 +101,7 @@ def render_watch_page(filename: str, video_url: str) -> str:
     aspect-ratio: 9 / 16;
     object-fit: contain;
     border-radius: 16px;
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 12px 40px rgba(21, 128, 61, 0.4);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 12px 40px rgba(0, 126, 122, 0.4);
   }}
 
   .actions {{
@@ -129,7 +129,7 @@ def render_watch_page(filename: str, video_url: str) -> str:
     color: var(--text);
     border: none;
     background: linear-gradient(135deg, var(--accent-mint), var(--bg-glow-1) 45%, var(--bg-glow-2));
-    box-shadow: 0 8px 24px rgba(34, 197, 94, 0.35);
+    box-shadow: 0 8px 24px rgba(0, 126, 122, 0.35);
   }}
 
   a.download:hover,
@@ -145,7 +145,7 @@ def render_watch_page(filename: str, video_url: str) -> str:
   button.share {{
     color: var(--text);
     background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(34, 197, 94, 0.6);
+    border: 1px solid rgba(0, 126, 122, 0.6);
   }}
 
   button.share:hover,
@@ -172,7 +172,7 @@ def render_watch_page(filename: str, video_url: str) -> str:
       <h1>Seu vídeo está pronto</h1>
       <video id="video" src="{safe_video_url}" controls playsinline preload="metadata"></video>
       <div class="actions">
-        <a class="download" href="{safe_video_url}" download="{safe_filename}">Baixar vídeo</a>
+        <a class="download" id="download-link" href="{safe_video_url}" download="{safe_filename}">Baixar vídeo</a>
         <button type="button" class="share" id="share-btn" hidden>Compartilhar</button>
       </div>
     </div>
@@ -180,8 +180,24 @@ def render_watch_page(filename: str, video_url: str) -> str:
   <script>
     (function () {{
       var video = document.getElementById('video');
+      var downloadLink = document.getElementById('download-link');
       var shareBtn = document.getElementById('share-btn');
       var shareBtnDefaultLabel = shareBtn.textContent;
+
+      function logWatchEvent(action) {{
+        try {{
+          fetch('/watch/{safe_filename}/event', {{
+            method: 'POST',
+            headers: {{ 'Content-Type': 'application/json' }},
+            body: JSON.stringify({{ action: action }}),
+            keepalive: true
+          }});
+        }} catch (e) {{}}
+      }}
+
+      downloadLink.addEventListener('click', function () {{
+        logWatchEvent('download');
+      }});
 
       function canShareFiles() {{
         if (!navigator.share || !navigator.canShare) return false;
@@ -208,6 +224,7 @@ def render_watch_page(filename: str, video_url: str) -> str:
             title: 'Meu vídeo',
             text: 'Confira meu vídeo!'
           }});
+          logWatchEvent('share');
         }} catch (error) {{
           if (error && error.name === 'AbortError') return;
           console.error('Erro ao compartilhar:', error);

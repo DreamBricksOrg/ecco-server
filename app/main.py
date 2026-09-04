@@ -2,6 +2,7 @@
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
+from pydantic import BaseModel
 import asyncio
 import logging
 from pathlib import Path
@@ -24,6 +25,12 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+class WatchEventRequest(BaseModel):
+    """Evento de interação do usuário na página /watch (download ou compartilhamento)"""
+    action: str
+
+_WATCH_EVENT_NAMES = {"download": "video_baixado", "share": "video_compartilhado"}
 
 def create_app() -> FastAPI:
     """Factory function para criar a aplicação FastAPI"""
@@ -78,6 +85,20 @@ def create_app() -> FastAPI:
             asyncio.create_task(sender.send("INFO", "pagina_download_acessada", data={"filename": safe_name}, status="OK"))
 
         return render_watch_page(safe_name, f"/videos/{safe_name}")
+
+    # Registra ações do usuário na página de watch (download/compartilhamento)
+    @app.post("/watch/{filename}/event")
+    async def watch_event(filename: str, event: WatchEventRequest):
+        safe_name = Path(filename).name  # evita path traversal (../)
+        event_name = _WATCH_EVENT_NAMES.get(event.action)
+        if not event_name:
+            raise HTTPException(status_code=400, detail="Ação inválida")
+
+        sender = get_sender()
+        if sender:
+            asyncio.create_task(sender.send("INFO", event_name, data={"filename": safe_name}, status="OK"))
+
+        return {"status": "ok"}
 
     # Limpeza automática de gravações antigas
     @app.on_event("startup")

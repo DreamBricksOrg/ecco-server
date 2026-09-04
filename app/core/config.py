@@ -49,6 +49,13 @@ class Settings(BaseSettings):
     VIDEO_TRIM_START_SECONDS: float = Field(0.0, env="VIDEO_TRIM_START_SECONDS")
     VIDEO_TRIM_END_SECONDS: float = Field(0.0, env="VIDEO_TRIM_END_SECONDS")
 
+    # Qualidade do vídeo de saída (reencode do overlay, via ffmpeg/libx264)
+    # CRF: 0-51, menor = melhor qualidade/maior arquivo (padrão libx264 ~23; usamos 26)
+    VIDEO_OVERLAY_CRF: int = Field(26, env="VIDEO_OVERLAY_CRF")
+    # Preset: controla velocidade de encode x compressão
+    # (ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow)
+    VIDEO_OVERLAY_PRESET: str = Field("veryfast", env="VIDEO_OVERLAY_PRESET")
+
     # Server Settings
     HOST: str = Field("0.0.0.0", env="HOST")
     PORT: int = Field(8000, env="PORT")

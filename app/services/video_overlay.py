@@ -77,6 +77,8 @@ def apply_overlay(
     video_path: Path,
     trim_start_seconds: float = 0.0,
     trim_end_seconds: float = 0.0,
+    crf: int = 26,
+    preset: str = "veryfast",
 ) -> bool:
     """Composita app/assets/ecco_msg.png sobre todo o vídeo em video_path, sobrescrevendo-o.
 
@@ -89,6 +91,9 @@ def apply_overlay(
     são cortados do início e/ou fim do vídeo antes do overlay ser aplicado. Se a
     duração não puder ser obtida, ou se o corte resultar em duração zero/negativa,
     o corte é ignorado e o vídeo é processado por inteiro.
+
+    crf e preset controlam a qualidade/velocidade do reencode libx264 (ver
+    VIDEO_OVERLAY_CRF e VIDEO_OVERLAY_PRESET em app/core/config.py).
     """
     ffmpeg_path = shutil.which("ffmpeg")
     if not ffmpeg_path:
@@ -151,8 +156,8 @@ def apply_overlay(
             cmd += ["-t", str(trimmed_duration)]
         cmd += [
             "-c:v", "libx264",
-            "-preset", "veryfast",
-            "-crf", "20",
+            "-preset", preset,
+            "-crf", str(crf),
             "-c:a", "copy",
             "-movflags", "+faststart",
             str(tmp_path),

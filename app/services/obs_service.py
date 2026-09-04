@@ -144,6 +144,8 @@ class OBSService:
                     directory / filename,
                     settings.VIDEO_TRIM_START_SECONDS,
                     settings.VIDEO_TRIM_END_SECONDS,
+                    settings.VIDEO_OVERLAY_CRF,
+                    settings.VIDEO_OVERLAY_PRESET,
                 )
 
             return True, ""

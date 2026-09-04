@@ -140,7 +140,11 @@ class OBSService:
             if filename:
                 settings = get_settings()
                 directory = Path(self._get_full_recording_path(settings.OBS_RECORDING_DIR))
-                apply_overlay(directory / filename)
+                apply_overlay(
+                    directory / filename,
+                    settings.VIDEO_TRIM_START_SECONDS,
+                    settings.VIDEO_TRIM_END_SECONDS,
+                )
 
             return True, ""
         except Exception as e:

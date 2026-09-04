@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     DELETE_OLD_FILES_MAX_LIFE: int = Field(60, env="DELETE_OLD_FILES_MAX_LIFE")
     DELETE_OLD_FILES_MAX_POLL: int = Field(5, env="DELETE_OLD_FILES_MAX_POLL")
 
+    # Corte de vídeo aplicado durante o processamento do overlay (em segundos)
+    VIDEO_TRIM_START_SECONDS: float = Field(0.0, env="VIDEO_TRIM_START_SECONDS")
+    VIDEO_TRIM_END_SECONDS: float = Field(0.0, env="VIDEO_TRIM_END_SECONDS")
+
     # Server Settings
     HOST: str = Field("0.0.0.0", env="HOST")
     PORT: int = Field(8000, env="PORT")

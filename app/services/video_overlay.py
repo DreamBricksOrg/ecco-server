@@ -23,6 +23,30 @@ def _find_ffprobe(ffmpeg_path: str) -> Optional[str]:
     return str(candidate) if candidate.is_file() else None
 
 
+def _get_video_duration(ffprobe_path: str, video_path: Path) -> Optional[float]:
+    """Obtém a duração (em segundos) do vídeo, via ffprobe"""
+    try:
+        result = subprocess.run(
+            [
+                ffprobe_path,
+                "-v", "error",
+                "-show_entries", "format=duration",
+                "-of", "csv=p=0",
+                str(video_path),
+            ],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            logger.error(f"ffprobe falhou ao ler duração de {video_path.name}: {result.stderr.strip()}")
+            return None
+
+        return float(result.stdout.strip())
+    except Exception as e:
+        logger.error(f"Erro inesperado ao obter duração de {video_path.name}: {e}")
+        return None
+
+
 def _get_video_resolution(ffprobe_path: str, video_path: Path) -> Optional[Tuple[int, int]]:
     """Obtém (largura, altura) do primeiro stream de vídeo, via ffprobe"""
     try:
@@ -49,13 +73,22 @@ def _get_video_resolution(ffprobe_path: str, video_path: Path) -> Optional[Tuple
         return None
 
 
-def apply_overlay(video_path: Path) -> bool:
+def apply_overlay(
+    video_path: Path,
+    trim_start_seconds: float = 0.0,
+    trim_end_seconds: float = 0.0,
+) -> bool:
     """Composita app/assets/ecco_msg.png sobre todo o vídeo em video_path, sobrescrevendo-o.
 
     Reencoda o vídeo com o overlay esticado para preencher exatamente a resolução
     do vídeo de entrada e presente do início ao fim. Em caso de falha (ffmpeg/ffprobe
     ausente, erro de processamento etc.), loga o erro e deixa o arquivo original
     intacto — quem chamar continua servindo o vídeo sem overlay.
+
+    Se trim_start_seconds e/ou trim_end_seconds forem maiores que zero, esses trechos
+    são cortados do início e/ou fim do vídeo antes do overlay ser aplicado. Se a
+    duração não puder ser obtida, ou se o corte resultar em duração zero/negativa,
+    o corte é ignorado e o vídeo é processado por inteiro.
     """
     ffmpeg_path = shutil.which("ffmpeg")
     if not ffmpeg_path:
@@ -80,33 +113,52 @@ def apply_overlay(video_path: Path) -> bool:
         return False
     width, height = resolution
 
+    trimmed_duration: Optional[float] = None
+    if trim_start_seconds > 0 or trim_end_seconds > 0:
+        duration = _get_video_duration(ffprobe_path, video_path)
+        if duration is None:
+            logger.warning(
+                f"Não foi possível obter a duração de {video_path.name}; corte será ignorado"
+            )
+        else:
+            candidate = duration - trim_start_seconds - trim_end_seconds
+            if candidate <= 0:
+                logger.warning(
+                    f"Corte configurado ({trim_start_seconds}s início + {trim_end_seconds}s fim) "
+                    f"é maior ou igual à duração de {video_path.name} ({duration}s); corte será ignorado"
+                )
+            else:
+                trimmed_duration = candidate
+
     fd, tmp_name = tempfile.mkstemp(suffix=video_path.suffix, dir=str(video_path.parent))
     os.close(fd)
     tmp_path = Path(tmp_name)
 
     try:
-        result = subprocess.run(
-            [
-                ffmpeg_path,
-                "-y",
-                "-i", str(video_path),
-                "-loop", "1",
-                "-i", str(_OVERLAY_IMAGE_PATH),
-                "-filter_complex",
-                f"[1:v]scale={width}:{height}[ovr];"
-                "[0:v][ovr]overlay=0:0:shortest=1:format=auto,format=yuv420p[v]",
-                "-map", "[v]",
-                "-map", "0:a?",
-                "-c:v", "libx264",
-                "-preset", "veryfast",
-                "-crf", "20",
-                "-c:a", "copy",
-                "-movflags", "+faststart",
-                str(tmp_path),
-            ],
-            capture_output=True,
-            text=True,
-        )
+        cmd = [ffmpeg_path, "-y"]
+        if trimmed_duration is not None and trim_start_seconds > 0:
+            cmd += ["-ss", str(trim_start_seconds)]
+        cmd += ["-i", str(video_path)]
+        cmd += ["-loop", "1", "-i", str(_OVERLAY_IMAGE_PATH)]
+        cmd += [
+            "-filter_complex",
+            f"[1:v]scale={width}:{height}[ovr];"
+            "[0:v][ovr]overlay=0:0:shortest=1:format=auto,format=yuv420p[v]",
+            "-map", "[v]",
+            "-map", "0:a?",
+        ]
+        if trimmed_duration is not None:
+            cmd += ["-t", str(trimmed_duration)]
+        cmd += [
+            "-c:v", "libx264",
+            "-preset", "veryfast",
+            "-crf", "20",
+            "-c:a", "copy",
+            "-movflags", "+faststart",
+            str(tmp_path),
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
 
         if result.returncode != 0:
             logger.error(

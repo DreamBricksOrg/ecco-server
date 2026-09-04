@@ -70,7 +70,14 @@ def create_app() -> FastAPI:
         if sender:
             asyncio.create_task(sender.send("INFO", "video_acessado", data={"filename": safe_name}, status="OK"))
 
-        return FileResponse(str(file_path), media_type="video/mp4", filename=safe_name)
+        return FileResponse(
+            str(file_path),
+            media_type="video/mp4",
+            filename=safe_name,
+            # Nome é um UUID gerado uma única vez por gravação: o conteúdo nunca muda,
+            # então o navegador pode cachear indefinidamente e evitar redownloads.
+            headers={"Cache-Control": "public, max-age=31536000, immutable"},
+        )
 
     # Página de player + download, aberta a partir do QR code de /api/recording/getvideo
     @app.get("/watch/{filename}", response_class=HTMLResponse)

@@ -158,8 +158,41 @@ def render_watch_page(filename: str, video_url: str) -> str:
     transform: translateY(0);
   }}
 
-  button.share[hidden] {{
-    display: none;
+  [hidden] {{
+    display: none !important;
+  }}
+
+  .loading {{
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 32px 0;
+  }}
+
+  .loading p {{
+    margin: 0;
+    font-size: 0.9rem;
+    text-align: center;
+    opacity: 0.85;
+  }}
+
+  .progress-track {{
+    width: 100%;
+    max-width: 280px;
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+  }}
+
+  .progress-fill {{
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--accent-mint), var(--accent-gold));
+    transition: width 0.2s ease;
   }}
 </style>
 </head>
@@ -170,9 +203,13 @@ def render_watch_page(filename: str, video_url: str) -> str:
   <main class="content">
     <div class="card">
       <h1>Seu vídeo está pronto</h1>
-      <video id="video" src="{safe_video_url}" controls playsinline preload="metadata"></video>
-      <div class="actions">
-        <a class="download" id="download-link" href="{safe_video_url}" download="{safe_filename}">Baixar vídeo</a>
+      <div class="loading" id="loading">
+        <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+        <p id="loading-text">Baixando vídeo…</p>
+      </div>
+      <video id="video" controls playsinline hidden></video>
+      <div class="actions" id="actions" hidden>
+        <a class="download" id="download-link" download="{safe_filename}">Baixar vídeo</a>
         <button type="button" class="share" id="share-btn" hidden>Compartilhar</button>
       </div>
     </div>
@@ -182,7 +219,13 @@ def render_watch_page(filename: str, video_url: str) -> str:
       var video = document.getElementById('video');
       var downloadLink = document.getElementById('download-link');
       var shareBtn = document.getElementById('share-btn');
+      var loading = document.getElementById('loading');
+      var actions = document.getElementById('actions');
+      var progressFill = document.getElementById('progress-fill');
+      var loadingText = document.getElementById('loading-text');
       var shareBtnDefaultLabel = shareBtn.textContent;
+      var videoUrl = '{safe_video_url}';
+      var videoBlob = null;
 
       function logWatchEvent(action) {{
         try {{
@@ -195,10 +238,6 @@ def render_watch_page(filename: str, video_url: str) -> str:
         }} catch (e) {{}}
       }}
 
-      downloadLink.addEventListener('click', function () {{
-        logWatchEvent('download');
-      }});
-
       function canShareFiles() {{
         if (!navigator.share || !navigator.canShare) return false;
         try {{
@@ -209,15 +248,88 @@ def render_watch_page(filename: str, video_url: str) -> str:
         }}
       }}
 
-      if (canShareFiles()) {{
-        shareBtn.hidden = false;
+      function setProgress(loaded, total) {{
+        if (total) {{
+          var pct = Math.min(100, Math.round((loaded / total) * 100));
+          progressFill.style.width = pct + '%';
+          loadingText.textContent = 'Baixando vídeo… ' + pct + '%';
+        }} else {{
+          loadingText.textContent = 'Baixando vídeo…';
+        }}
       }}
 
-      shareBtn.addEventListener('click', async function () {{
+      function onVideoReady() {{
+        var objectUrl = URL.createObjectURL(videoBlob);
+        video.src = objectUrl;
+        downloadLink.href = objectUrl;
+        loading.hidden = true;
+        video.hidden = false;
+        actions.hidden = false;
+        if (canShareFiles()) {{
+          shareBtn.hidden = false;
+        }}
+      }}
+
+      function showError() {{
+        loadingText.textContent = 'Falha ao carregar o vídeo. Toque para tentar novamente.';
+        loading.style.cursor = 'pointer';
+        loading.addEventListener('click', retry, {{ once: true }});
+      }}
+
+      function retry() {{
+        loading.style.cursor = '';
+        progressFill.style.width = '0%';
+        loadingText.textContent = 'Baixando vídeo…';
+        fetchVideo();
+      }}
+
+      // Baixa o vídeo uma única vez e reaproveita o mesmo Blob para reprodução,
+      // download e compartilhamento — evita 3 downloads separados em rede lenta.
+      async function fetchVideo() {{
         try {{
-          var response = await fetch(video.currentSrc || video.src);
-          var blob = await response.blob();
-          var file = new File([blob], '{safe_filename}', {{ type: blob.type || 'video/mp4' }});
+          var response = await fetch(videoUrl);
+          if (!response.ok) throw new Error('HTTP ' + response.status);
+
+          if (!response.body) {{
+            videoBlob = await response.blob();
+            onVideoReady();
+            return;
+          }}
+
+          var total = Number(response.headers.get('Content-Length')) || 0;
+          var contentType = response.headers.get('Content-Type') || 'video/mp4';
+          var reader = response.body.getReader();
+          var chunks = [];
+          var loaded = 0;
+
+          for (;;) {{
+            var result = await reader.read();
+            if (result.done) break;
+            chunks.push(result.value);
+            loaded += result.value.length;
+            setProgress(loaded, total);
+          }}
+
+          videoBlob = new Blob(chunks, {{ type: contentType }});
+          onVideoReady();
+        }} catch (error) {{
+          console.error('Erro ao baixar vídeo:', error);
+          showError();
+        }}
+      }}
+
+      downloadLink.addEventListener('click', function (e) {{
+        if (!videoBlob) {{
+          e.preventDefault();
+          return;
+        }}
+        logWatchEvent('download');
+      }});
+
+      shareBtn.addEventListener('click', async function () {{
+        if (!videoBlob) return;
+        try {{
+          var file = new File([videoBlob], '{safe_filename}', {{ type: videoBlob.type || 'video/mp4' }});
 
           await navigator.share({{
             files: [file],
@@ -234,6 +346,8 @@ def render_watch_page(filename: str, video_url: str) -> str:
           }}, 2000);
         }}
       }});
+
+      fetchVideo();
     }})();
   </script>
 </body>
